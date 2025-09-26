@@ -1,37 +1,37 @@
-// n8n-workflows/product-extraction.json
 {
-  "name": "AI Product Extraction Workflow",
+  "name": "AI Product Extraction from Images",
   "nodes": [
     {
       "parameters": {
-        "path": "webhook/product-upload"
+        "path": "/upload-image",
+        "methods": ["POST"]
       },
-      "name": "Webhook",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 1,
-      "position": [240, 300]
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook"
     },
     {
       "parameters": {
-        "functionCode": "// Process image and extract product info\nconst { imageUrl, userId } = $input.first().json;\nreturn { imageUrl, userId, timestamp: new Date().toISOString() };"
+        "operation": "base64ToBinary"
       },
-      "name": "Process Image Data",
-      "type": "n8n-nodes-base.function",
-      "typeVersion": 1,
-      "position": [460, 300]
+      "name": "Process Image",
+      "type": "n8n-nodes-base.base64"
+    },
+    {
+      "parameters": {
+        "model": "gpt-4-vision-preview",
+        "prompt": "Extract product name, description, and price from this restaurant menu image. Return as JSON: {name: '', description: '', price: 0}"
+      },
+      "name": "LangChain AI Processing",
+      "type": "n8n-nodes-base.openAi"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "table": "products",
+        "data": "={{ $json }}"
+      },
+      "name": "Save to Supabase",
+      "type": "n8n-nodes-base.supabase"
     }
-  ],
-  "connections": {
-    "Webhook": {
-      "main": [
-        [
-          {
-            "node": "Process Image Data",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    }
-  }
+  ]
 }
