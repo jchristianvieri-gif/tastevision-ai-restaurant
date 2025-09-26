@@ -1,0 +1,37 @@
+// n8n-workflows/product-extraction.json
+{
+  "name": "AI Product Extraction Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "webhook/product-upload"
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Process image and extract product info\nconst { imageUrl, userId } = $input.first().json;\nreturn { imageUrl, userId, timestamp: new Date().toISOString() };"
+      },
+      "name": "Process Image Data",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [460, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Process Image Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
