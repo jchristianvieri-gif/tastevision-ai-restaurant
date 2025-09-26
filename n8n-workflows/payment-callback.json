@@ -1,0 +1,38 @@
+{
+  "name": "Payment Confirmation Handler",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "/payment-callback",
+        "methods": ["POST"]
+      },
+      "name": "Payment Webhook",
+      "type": "n8n-nodes-base.webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.status }}",
+              "operation": "equal",
+              "value2": "success"
+            }
+          ]
+        }
+      },
+      "name": "Check Payment Status",
+      "type": "n8n-nodes-base.if"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "table": "orders",
+        "updateKey": "order_id",
+        "data": "={{ { status: 'paid', paid_at: new Date() } }}"
+      },
+      "name": "Update Order Status",
+      "type": "n8n-nodes-base.supabase"
+    }
+  ]
+}
