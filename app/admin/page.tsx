@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { createClient } from '@/lib/supabase';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import Image from 'next/image';
 
 interface Product {
@@ -17,8 +17,7 @@ const AdminPage: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
-
-  const supabase = createClient();
+  const supabase = createClientComponentClient();
 
   useEffect(() => {
     fetchProducts();
@@ -47,10 +46,6 @@ const AdminPage: React.FC = () => {
     setUploading(true);
 
     try {
-      // Simulate AI extraction (akan diganti dengan LangChain nanti)
-      const formData = new FormData();
-      formData.append('image', file);
-
       // Upload image to Supabase Storage
       const fileName = `${Date.now()}-${file.name}`;
       const { data: uploadData, error: uploadError } = await supabase.storage
@@ -64,7 +59,7 @@ const AdminPage: React.FC = () => {
         .from('product-images')
         .getPublicUrl(fileName);
 
-      // Simulate AI extraction - placeholder untuk sekarang
+      // Simulate AI extraction - akan diganti dengan LangChain nanti
       const extractedData = {
         name: `Product ${Date.now()}`,
         description: 'Description extracted from image',
@@ -85,7 +80,7 @@ const AdminPage: React.FC = () => {
 
       if (insertError) throw insertError;
 
-      await fetchProducts(); // Refresh list
+      await fetchProducts();
       alert('Product added successfully!');
     } catch (error) {
       console.error('Error uploading product:', error);
@@ -108,7 +103,6 @@ const AdminPage: React.FC = () => {
       <div className="max-w-6xl mx-auto">
         <h1 className="text-3xl font-bold mb-8">Admin Panel</h1>
         
-        {/* Upload Section */}
         <div className="bg-white p-6 rounded-lg shadow-md mb-8">
           <h2 className="text-xl font-semibold mb-4">Add New Product</h2>
           <input
@@ -121,7 +115,6 @@ const AdminPage: React.FC = () => {
           {uploading && <p>Processing image with AI...</p>}
         </div>
 
-        {/* Products List */}
         <div className="bg-white p-6 rounded-lg shadow-md">
           <h2 className="text-xl font-semibold mb-4">Products ({products.length})</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
