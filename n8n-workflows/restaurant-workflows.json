@@ -1,0 +1,64 @@
+{
+  "workflows": [
+    {
+      "name": "Process Product Image",
+      "nodes": [
+        {
+          "id": "1",
+          "name": "Webhook Receive Image",
+          "type": "n8n-nodes-base.webhook",
+          "parameters": {
+            "httpMethod": "POST",
+            "path": "product-upload"
+          }
+        },
+        {
+          "id": "2", 
+          "name": "Extract Image Info with LangChain",
+          "type": "n8n-nodes-base.httpRequest",
+          "parameters": {
+            "method": "POST",
+            "url": "{{$vars.API_URL}}/api/ai/extract",
+            "authentication": "predefinedCredentialType",
+            "nodeCredentialType": "httpHeaderAuth"
+          }
+        },
+        {
+          "id": "3",
+          "name": "Save to Supabase",
+          "type": "n8n-nodes-base.supabase",
+          "parameters": {
+            "operation": "insert",
+            "table": "products",
+            "data": "={{{\n  name: $json(\"name\"),\n  description: $json(\"description\"), \n  price: $json(\"price\"),\n  image_url: $json(\"image_url\")\n}}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Handle Payment Callback",
+      "nodes": [
+        {
+          "id": "1",
+          "name": "Midtrans Webhook",
+          "type": "n8n-nodes-base.webhook", 
+          "parameters": {
+            "httpMethod": "POST",
+            "path": "payment-callback"
+          }
+        },
+        {
+          "id": "2",
+          "name": "Update Order Status",
+          "type": "n8n-nodes-base.supabase",
+          "parameters": {
+            "operation": "update",
+            "table": "orders",
+            "updateKey": "order_id",
+            "data": "={{{\n  status: $json(\"transaction_status\"),\n  payment_status: $json(\"transaction_status\")\n}}}"
+          }
+        }
+      ]
+    }
+  ]
+}
