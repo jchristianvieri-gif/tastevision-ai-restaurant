@@ -1,0 +1,57 @@
+// apps/n8n-workflows/product-processing.json
+{
+  "name": "AI Product Processing Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "supabaseUrl": "{{ $env.SUPABASE_URL }}",
+        "serviceRoleKey": "{{ $env.SUPABASE_SERVICE_ROLE_KEY }}",
+        "tableName": "product_uploads",
+        "triggerOn": "insert"
+      },
+      "type": "supabase-trigger",
+      "name": "Product Upload Trigger",
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const { OpenAI } = require('openai');\nconst openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });\n\nasync function extractProductInfo(imageBase64) {\n  const response = await openai.chat.completions.create({\n    model: \"gpt-4-vision-preview\",\n    max_tokens: 500,\n    messages: [\n      {\n        role: \"user\",\n        content: [\n          {\n            type: \"text\",\n            text: `Extract restaurant menu item information. Return JSON: {\n              \"name\": \"string\",\n              \"description\": \"string\", \n              \"price\": \"number\",\n              \"category\": \"food|drink|dessert\",\n              \"confidence\": \"number\"\n            }`\n          },\n          {\n            type: \"image_url\",\n            image_url: { url: `data:image/jpeg;base64,${imageBase64}` }\n          }\n        ]\n      }\n    ]\n  });\n  \n  return JSON.parse(response.choices[0].message.content);\n}\n\nconst imageData = $input.first().json.image_data;\nreturn await extractProductInfo(imageData);"
+      },
+      "type": "function",
+      "name": "AI Extraction",
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "supabaseUrl": "{{ $env.SUPABASE_URL }}",
+        "serviceRoleKey": "{{ $env.SUPABASE_SERVICE_ROLE_KEY }}",
+        "tableName": "products",
+        "dataToSend": "={{\n  name: $json.name,\n  description: $json.description,\n  price: $json.price,\n  category: $json.category,\n  ai_generated: true,\n  ai_confidence: $json.confidence\n}}"
+      },
+      "type": "supabase-insert",
+      "name": "Save to Database",
+      "position": [760, 300]
+    },
+    {
+      "parameters": {
+        "channel": "products",
+        "event": "new_product",
+        "data": "={{ $json }}"
+      },
+      "type": "supabase-realtime",
+      "name": "Real-time Update",
+      "position": [1020, 300]
+    }
+  ],
+  "connections": {
+    "Product Upload Trigger": {
+      "main": [[{ "node": "AI Extraction", "type": "main", "index": 0 }]]
+    },
+    "AI Extraction": {
+      "main": [[{ "node": "Save to Database", "type": "main", "index": 0 }]]
+    },
+    "Save to Database": {
+      "main": [[{ "node": "Real-time Update", "type": "main", "index": 0 }]]
+    }
+  }
+}
