@@ -1,64 +1,118 @@
 {
-  "workflows": [
+  "name": "TasteVision Restaurant Workflows",
+  "nodes": [
     {
-      "name": "Process Product Image",
-      "nodes": [
-        {
-          "id": "1",
-          "name": "Webhook Receive Image",
-          "type": "n8n-nodes-base.webhook",
-          "parameters": {
-            "httpMethod": "POST",
-            "path": "product-upload"
+      "workflow": {
+        "name": "Process Product Image Upload",
+        "nodes": [
+          {
+            "parameters": {
+              "httpMethod": "POST",
+              "path": "product-upload"
+            },
+            "name": "Product Upload Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "id": "product-webhook"
+          },
+          {
+            "parameters": {
+              "method": "POST",
+              "url": "{{$env.NEXT_PUBLIC_APP_URL}}/api/ai/extract",
+              "authentication": "headerAuth",
+              "sendHeaders": true,
+              "headerParameters": {
+                "parameters": [
+                  {
+                    "name": "Content-Type",
+                    "value": "application/json"
+                  }
+                ]
+              }
+            },
+            "name": "AI Extraction API",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 1,
+            "id": "ai-extraction"
+          },
+          {
+            "parameters": {
+              "operation": "create",
+              "table": "products",
+              "data": "={{{\n  name: $json(\"name\"),\n  description: $json(\"description\"),\n  price: $json(\"price\"),\n  image_url: $json(\"image_url\"),\n  category: $json(\"category\"),\n  created_at: new Date().toISOString()\n}}}"
+            },
+            "name": "Save to Supabase",
+            "type": "n8n-nodes-base.supabase",
+            "typeVersion": 1,
+            "id": "save-supabase"
           }
-        },
-        {
-          "id": "2", 
-          "name": "Extract Image Info with LangChain",
-          "type": "n8n-nodes-base.httpRequest",
-          "parameters": {
-            "method": "POST",
-            "url": "{{$vars.API_URL}}/api/ai/extract",
-            "authentication": "predefinedCredentialType",
-            "nodeCredentialType": "httpHeaderAuth"
-          }
-        },
-        {
-          "id": "3",
-          "name": "Save to Supabase",
-          "type": "n8n-nodes-base.supabase",
-          "parameters": {
-            "operation": "insert",
-            "table": "products",
-            "data": "={{{\n  name: $json(\"name\"),\n  description: $json(\"description\"), \n  price: $json(\"price\"),\n  image_url: $json(\"image_url\")\n}}}"
+        ],
+        "connections": {
+          "Product Upload Webhook": {
+            "main": [
+              [
+                {
+                  "node": "AI Extraction API",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "AI Extraction API": {
+            "main": [
+              [
+                {
+                  "node": "Save to Supabase",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
           }
         }
-      ]
+      }
     },
     {
-      "name": "Handle Payment Callback",
-      "nodes": [
-        {
-          "id": "1",
-          "name": "Midtrans Webhook",
-          "type": "n8n-nodes-base.webhook", 
-          "parameters": {
-            "httpMethod": "POST",
-            "path": "payment-callback"
+      "workflow": {
+        "name": "Handle Payment Callbacks",
+        "nodes": [
+          {
+            "parameters": {
+              "httpMethod": "POST",
+              "path": "payment-callback"
+            },
+            "name": "Payment Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "id": "payment-webhook"
+          },
+          {
+            "parameters": {
+              "method": "POST",
+              "url": "{{$env.NEXT_PUBLIC_APP_URL}}/api/webhook/payment",
+              "authentication": "headerAuth"
+            },
+            "name": "Process Payment",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 1,
+            "id": "process-payment"
           }
-        },
-        {
-          "id": "2",
-          "name": "Update Order Status",
-          "type": "n8n-nodes-base.supabase",
-          "parameters": {
-            "operation": "update",
-            "table": "orders",
-            "updateKey": "order_id",
-            "data": "={{{\n  status: $json(\"transaction_status\"),\n  payment_status: $json(\"transaction_status\")\n}}}"
+        ],
+        "connections": {
+          "Payment Webhook": {
+            "main": [
+              [
+                {
+                  "node": "Process Payment",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
           }
         }
-      ]
+      }
     }
   ]
 }
