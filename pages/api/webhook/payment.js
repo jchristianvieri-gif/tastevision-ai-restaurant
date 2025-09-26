@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import crypto from 'crypto';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -11,28 +10,60 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Verify Midtrans signature (simplified)
-  const signature = req.headers['x-midtrans-signature'];
-  // Add proper verification in production
+  console.log('Payment webhook received:', JSON.stringify(req.body, null, 2));
 
-  const { order_id, transaction_status, gross_amount } = req.body;
+  const {
+    order_id,
+    transaction_status,
+    fraud_status,
+    gross_amount,
+    payment_type,
+    transaction_time
+  } = req.body;
 
   try {
-    // Update order status in database
-    const { error } = await supabase
+    // Update order status based on payment result
+    let status = 'pending';
+    
+    if (transaction_status === 'capture' || transaction_status === 'settlement') {
+      status = 'paid';
+    } else if (transaction_status === 'deny' || transaction_status === 'cancel' || transaction_status === 'expire') {
+      status = 'failed';
+    } else if (transaction_status === 'pending') {
+      status = 'pending';
+    }
+
+    const { data, error } = await supabase
       .from('orders')
       .update({ 
-        status: transaction_status === 'settlement' ? 'paid' : transaction_status,
-        updated_at: new Date().toISOString()
+        status: status,
+        payment_status: transaction_status,
+        updated_at: new Date().toISOString(),
+        payment_data: req.body
       })
-      .eq('order_id', order_id);
+      .eq('order_id', order_id)
+      .select();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Database update error:', error);
+      throw error;
+    }
 
-    console.log(`Order ${order_id} updated to status: ${transaction_status}`);
-    res.status(200).json({ received: true });
+    console.log(`Order ${order_id} updated to status: ${status}`);
+
+    // Send response to Midtrans
+    res.status(200).json({ 
+      status: 'ok', 
+      message: 'Webhook processed successfully',
+      order_id: order_id,
+      updated_status: status
+    });
+
   } catch (error) {
-    console.error('Webhook error:', error);
-    res.status(500).json({ error: 'Webhook processing failed' });
+    console.error('Webhook processing error:', error);
+    res.status(500).json({ 
+      error: 'Webhook processing failed',
+      details: error.message 
+    });
   }
 }
